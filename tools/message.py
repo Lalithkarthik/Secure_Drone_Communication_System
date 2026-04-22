@@ -1,0 +1,101 @@
+"""
+tools/message.py
+================
+DroneMessage — the telemetry payload sent from the Drone to the GCS.
+
+Coordinate system
+-----------------
+The Ground Control Station sits at the origin (0, 0, 0).
+All positions are in metres relative to that origin.
+Velocities are in m/s along each axis.
+
+Replay protection
+-----------------
+Every message carries a UUID4 nonce generated at construction time.
+The GCS's NonceManager checks this nonce is unseen before accepting the message.
+Timestamps are intentionally omitted — nonce-based replay protection is used instead.
+"""
+
+import json
+import uuid
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Tuple
+
+
+class DroneStatus(Enum):
+    """Operational states the drone can report."""
+    FLYING    = "FLYING"
+    HOVERING  = "HOVERING"
+    LANDING   = "LANDING"
+    RETURNING = "RETURNING"
+
+
+@dataclass
+class DroneMessage:
+    """
+    One telemetry packet from the Drone.
+
+    Attributes
+    ----------
+    drone_id    : unique drone identifier string
+    position    : (x, y, z) in metres, relative to GCS origin (0, 0, 0)
+    velocity    : (vx, vy, vz) velocity components in m/s
+    battery_pct : remaining battery as a float 0–100
+    status      : current DroneStatus enum value
+    mission_id  : mission this packet belongs to
+    nonce       : auto-generated UUID4 — ensures every packet is unique
+    """
+
+    drone_id:    str
+    position:    Tuple[float, float, float]
+    velocity:    Tuple[float, float, float]
+    battery_pct: float
+    status:      DroneStatus
+    mission_id:  str
+    nonce:       str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    # ------------------------------------------------------------------
+    # Serialisation helpers
+    # ------------------------------------------------------------------
+
+    def to_json(self) -> str:
+        """Serialise the message to a deterministic JSON string."""
+        return json.dumps(
+            {
+                "drone_id":    self.drone_id,
+                "position":    list(self.position),
+                "velocity":    list(self.velocity),
+                "battery_pct": self.battery_pct,
+                "status":      self.status.value,
+                "mission_id":  self.mission_id,
+                "nonce":       self.nonce,
+            },
+            sort_keys=True,
+        )
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "DroneMessage":
+        """Deserialise a DroneMessage from a JSON string."""
+        data = json.loads(json_str)
+        return cls(
+            drone_id=    data["drone_id"],
+            position=    tuple(data["position"]),
+            velocity=    tuple(data["velocity"]),
+            battery_pct= data["battery_pct"],
+            status=      DroneStatus(data["status"]),
+            mission_id=  data["mission_id"],
+            nonce=       data["nonce"],
+        )
+
+    def pretty(self) -> str:
+        """Human-readable summary for logging."""
+        return (
+            f"DroneMessage("
+            f"id={self.drone_id}, "
+            f"pos={self.position}, "
+            f"vel={self.velocity}, "
+            f"battery={self.battery_pct:.1f}%, "
+            f"status={self.status.value}, "
+            f"mission={self.mission_id})"
+        )
