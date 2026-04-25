@@ -1,104 +1,74 @@
 """
 main.py
 =======
-Secure Drone Communication System — Demo Entry Point
+Secure Drone Communication System - Demo Entry Point
 
 Run with:   python main.py
 
 Sequence
 --------
-1. Pre-mission provisioning  — RSA public key exchange
-2. CHAP authentication       — drone proves identity to GCS
-3. DH key exchange           — shared MAC key established
-4. Session key distribution  — AES-256 key wrapped with RSA
-5. Telemetry transmission    — multiple packets (shows nonce rotation)
-6. Attack simulation 1       — Replay Attack       → BLOCKED
-7. Attack simulation 2       — MITM Attack         → BLOCKED
+1. Pre-mission provisioning  - RSA public key exchange
+2. CHAP authentication       - drone proves identity to GCS
+3. DH key exchange           - shared MAC key established
+4. Session key distribution  - AES-256 key wrapped with RSA
+5. Telemetry transmission    - multiple packets (shows nonce rotation)
+6. Attack simulation 1       - Replay Attack       → BLOCKED
+7. Attack simulation 2       - MITM Attack         → BLOCKED
 """
 
-import sys
-import os
-import json
-
-# Ensure repo root is on the path regardless of where we run from
-sys.path.insert(0, os.path.dirname(__file__))
-
-from drone          import Drone
+from drone import Drone
 from ground_station import GroundStation, SecurityException
-from tools          import DroneMessage, DroneStatus
-from attacks        import ReplayAttacker, MITMAttacker
+from tools import DroneMessage, DroneStatus
+from attacks import ReplayAttacker, MITMAttacker
 
+#Drone Configuration
+DRONE_ID = "ALPHA_007"
+SHARED_PASSWORD = "7thNe^erF@!ls"    #pre-shared password for authentication
+MISSION_ID = "MISSION_SCOUT_V7"
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-SHARED_PASSWORD = "Secur3Drone#Pass!"    # pre-shared CHAP secret
-DRONE_ID        = "DR001"
-MISSION_ID      = "MISSION_ALPHA_001"
+#Helpers for the sequential execution of proper communication flow
 
-
-# ---------------------------------------------------------------------------
-# Pretty-printing helpers
-# ---------------------------------------------------------------------------
-
-def banner(title: str) -> None:
-    width = 62
-    print("\n" + "=" * width)
-    print(f"  {title}")
-    print("=" * width)
-
-def section(title: str) -> None:
-    print(f"\n--- {title} ---")
-
-def show_packet_summary(packet: dict) -> None:
-    """Print a condensed, readable summary of a transmitted packet."""
-    print("\n  [Packet on the wire]")
-    print(f"  ciphertext  : {packet['ciphertext'][:32]}...  ({len(packet['ciphertext'])} chars b64)")
-    print(f"  aes_nonce   : {packet['aes_nonce']}")
-    print(f"  mac         : {packet['mac'][:32]}...")
-    print(f"  signature   : {packet['signature'][:32]}...  ({len(packet['signature'])} chars b64)")
-    print(f"  msg_nonce   : {packet['msg_nonce']}")
-
-
-# ---------------------------------------------------------------------------
-# Phase runners
-# ---------------------------------------------------------------------------
-
-def phase_provisioning(drone: Drone, gcs: GroundStation) -> None:
-    section("Pre-Mission Key Provisioning")
+def rsa_key_exchange(drone: Drone, gcs: GroundStation) -> None:
+    """
+    Provides the Drone and Ground Station with each other's public keys. 
+    """
+    print("\nRSA Keys being exchanged between Drone and Ground Station...")
     drone.set_gcs_public_key(gcs.get_public_rsa_key())
     gcs.enroll_drone_public_key(drone.get_public_rsa_key())
-    print("  [✓] RSA public keys exchanged and enrolled.")
+    print("RSA public keys exchanged and enrolled successfully.")
 
 
-def phase_authentication(drone: Drone, gcs: GroundStation) -> None:
-    section("Phase 1 — CHAP Authentication")
+def drone_gcs_authentication(drone: Drone, gcs: GroundStation) -> None:
+    """
+    Authentication between the drone and ground station in a format same as the challenge handshake protocol.
+    """
+    print("\nPhase 1 - CHAP Authentication")
     challenge = gcs.issue_challenge()
-    response  = drone.respond_to_challenge(challenge)
-    success   = gcs.verify_challenge_response(response)
+    response = drone.respond_to_challenge(challenge)
+    success = gcs.verify_challenge_response(response)
     if not success:
-        raise RuntimeError("Authentication failed — aborting.")
+        raise RuntimeError("Authentication failed - Rouge Drone identified. Aborting mission.") #Would run if the pre-shared passwords aren't the same.
 
 
 def phase_key_exchange(drone: Drone, gcs: GroundStation) -> None:
-    section("Phase 2 — Diffie–Hellman Key Exchange")
+    print("\nPhase 2 - Diffie–Hellman Key Exchange")
     drone_dh_pub = drone.init_dh()
     gcs_dh_pub   = gcs.init_dh()
     # Each side independently derives the same shared MAC key
     drone.complete_dh(gcs_dh_pub)
     gcs.complete_dh(drone_dh_pub)
-    print("  [✓] Both sides derived the same shared secret independently.")
+    print("  Both sides derived the same shared secret independently.")
 
 
 def phase_session_key(drone: Drone, gcs: GroundStation) -> None:
-    section("Phase 3 — Session Key Distribution (RSA)")
+    print("\nPhase 3 - Session Key Distribution (RSA)")
     encrypted_key = drone.generate_and_send_session_key()
     gcs.receive_session_key(encrypted_key)
-    print("  [✓] AES-256 session key securely transferred via RSA-OAEP.")
+    print("  AES-256 session key securely transferred via RSA-OAEP.")
 
 
 def phase_telemetry(drone: Drone, gcs: GroundStation) -> list[dict]:
-    section("Phase 4 — Telemetry Transmission")
+    print("\nPhase 4 - Telemetry Transmission")
 
     # Telemetry samples representing a drone mid-mission
     messages = [
@@ -133,7 +103,14 @@ def phase_telemetry(drone: Drone, gcs: GroundStation) -> list[dict]:
         print(f"\n  [Packet {i}] Sending: {msg.pretty()}")
         print(f"  [Packet {i}] JSON  : {msg.to_json()}")
         packet = drone.send_telemetry(msg)
-        show_packet_summary(packet)
+
+        print("\n  [Packet on the wire]")
+        print(f"  ciphertext  : {packet['ciphertext'][:32]}...  ({len(packet['ciphertext'])} chars b64)")
+        print(f"  aes_nonce   : {packet['aes_nonce']}")
+        print(f"  mac         : {packet['mac'][:32]}...")
+        print(f"  signature   : {packet['signature'][:32]}...  ({len(packet['signature'])} chars b64)")
+        print(f"  msg_nonce   : {packet['msg_nonce']}")
+
         gcs.receive_telemetry(packet)
         sent_packets.append(packet)
 
@@ -145,19 +122,15 @@ def phase_telemetry(drone: Drone, gcs: GroundStation) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def simulate_replay_attack(gcs: GroundStation, captured_packet: dict) -> None:
-    banner("ATTACK SIMULATION 1 — REPLAY ATTACK")
-    print(
-        "\n  Scenario: Eve captured packet #1 from the channel.\n"
-        "  She re-submits it to the GCS hoping it will be re-processed.\n"
-        "  Defence: GCS NonceManager has already seen this nonce.\n"
-    )
+    print("ATTACK SIMULATION 1 - REPLAY ATTACK")
+    print("A cryptanalyst has captured packet #1 from the channel and tries re-submitting it to the Ground Station, creating a replay attack.\n")
     attacker = ReplayAttacker()
     attacker.capture(captured_packet)
     attacker.attack(gcs)
 
 
 def simulate_mitm_attack() -> None:
-    banner("ATTACK SIMULATION 2 — MAN-IN-THE-MIDDLE ATTACK")
+    print("ATTACK SIMULATION 2 - MAN-IN-THE-MIDDLE ATTACK")
     print(
         "\n  Scenario: Eve knows the CHAP password and intercepts the DH exchange.\n"
         "  She substitutes her own DH keys and forges a telemetry packet.\n"
@@ -184,43 +157,33 @@ def simulate_mitm_attack() -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    banner("SECURE DRONE COMMUNICATION SYSTEM — AD310")
-    print(f"\n  Drone ID   : {DRONE_ID}")
-    print(f"  Mission    : {MISSION_ID}")
-    print(f"  Password   : {'*' * len(SHARED_PASSWORD)}  (pre-shared, never transmitted)")
+    """
+    Executes the entire communication system between the drone and the ground station. Also simulates the attacks and shows the
+    system's capability to deal with them.
+    """
 
-    # Instantiate the two communicating entities
+    print("SECURE DRONE COMMUNICATION SYSTEM")
+    print(f"Drone ID   : {DRONE_ID}")
+    print(f"Mission    : {MISSION_ID}")
+    print(f"Password   : {SHARED_PASSWORD}\n") #The password is used to initialise both drone and ground station and works for authenticating the devices and establishing the connection.
+
+    #Initialise both drone and ground station.
     drone = Drone(DRONE_ID, SHARED_PASSWORD)
-    gcs   = GroundStation(SHARED_PASSWORD)
+    ground_station = GroundStation(SHARED_PASSWORD) #Passwords passed to both drone and ground station - assume pre-defined.
 
-    # Run the normal secure communication flow
-    banner("NORMAL SECURE COMMUNICATION FLOW")
-    phase_provisioning(drone, gcs)
-    phase_authentication(drone, gcs)
-    phase_key_exchange(drone, gcs)
-    phase_session_key(drone, gcs)
-    packets = phase_telemetry(drone, gcs)
+    #The regular communication flow is executed.
+    print("\nCOMMUNICATION:")
+    rsa_key_exchange(drone, ground_station)
+    drone_gcs_authentication(drone, ground_station)
+    phase_key_exchange(drone, ground_station)
+    phase_session_key(drone, ground_station)
+    packets = phase_telemetry(drone, ground_station)
 
-    print("\n  [✓] All telemetry packets received, verified, and decrypted successfully.")
+    print("\nAll telemetry packets received, verified, and decrypted successfully.\nCOMPLETE COMMUNICATION SUCCESSFUL.\n")
 
-    # Run attack simulations
-    simulate_replay_attack(gcs, packets[0])   # use the first accepted packet
+    #Both replay and mitm attacks are simulated.
+    simulate_replay_attack(ground_station, packets[0]) #Replay attack is simulated using the first accepted packet, which is assumed to be known to cryptanalyst.
     simulate_mitm_attack()
-
-    # Final summary
-    banner("SUMMARY")
-    print(
-        "\n  Security properties demonstrated:\n"
-        "  ✓  Confidentiality    — AES-256-CTR encrypts all telemetry data\n"
-        "  ✓  Authentication     — CHAP challenge-response (password never sent)\n"
-        "  ✓  Key exchange       — Diffie–Hellman (2048-bit MODP Group 14)\n"
-        "  ✓  Forward secrecy    — ephemeral DH keys; new session key each run\n"
-        "  ✓  Integrity          — HMAC-SHA256 (Encrypt-then-MAC)\n"
-        "  ✓  Non-repudiation    — RSA-PSS-SHA256 digital signatures\n"
-        "  ✓  Replay protection  — UUID4 nonce registry (NonceManager)\n"
-        "  ✓  MITM resistance    — RSA signature binds message to enrolled Drone\n"
-    )
-
 
 if __name__ == "__main__":
     main()
