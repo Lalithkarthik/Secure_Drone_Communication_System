@@ -1,10 +1,3 @@
-"""
-tools/__init__.py
-=================
-Public API for the tools package.
-Import everything from here rather than from individual modules.
-"""
-
 from .authentication    import CHAPAuthenticator, PasswordStore
 from .digital_signature import RSA_Signer
 from .encryption        import HybridEncryptor
