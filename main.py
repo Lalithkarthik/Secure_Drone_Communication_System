@@ -40,7 +40,6 @@ def rsa_key_exchange(drone: Drone, gcs: GroundStation) -> None:
     gcs.enroll_drone_public_key(drone.get_public_rsa_key())
     print("RSA public keys exchanged and enrolled successfully.")
 
-
 def drone_gcs_authentication(drone: Drone, gcs: GroundStation) -> None:
     """
     Authentication between the drone and ground station in a format same as the challenge handshake protocol.
@@ -54,7 +53,6 @@ def drone_gcs_authentication(drone: Drone, gcs: GroundStation) -> None:
     if not success:
         raise RuntimeError("Authentication failed - Rouge Drone identified. Aborting mission.") #Would run if the pre-shared passwords aren't the same.
 
-#NEEDS CHECKING
 def key_exchange(drone: Drone, gcs: GroundStation) -> None:
     print("\nTask 3.1 - Diffie-Hellman Key Exchange")
     print("Diffie Hellman being used for Key Exchange...")
@@ -64,8 +62,8 @@ def key_exchange(drone: Drone, gcs: GroundStation) -> None:
     # Each side independently derives the same shared MAC key
     drone.complete_dh(gcs_dh_pub)
     gcs.complete_dh(drone_dh_pub)
-    print("Both sides derived the same shared secret independently.")
-
+    sleep(1)
+    print("Diffie-Hellman used for key-exchange used in MAC completed successfully.")
 
 def aes_session_key(drone: Drone, gcs: GroundStation) -> None:
     """
@@ -78,12 +76,12 @@ def aes_session_key(drone: Drone, gcs: GroundStation) -> None:
     gcs.receive_session_key(encrypted_key)
     print("AES-256 session key securely transferred via RSA-OAEP.")
 
-
 def message_transmission(drone: Drone, gcs: GroundStation) -> None:
     """
     Simulates the message transmission, once all previous steps have completed and the Drone and Ground Station are prepared to communicate.
     """
-    print("\nMessage Transmission taking place from Drone to Ground Station:")
+    print("\nSession successfully established. Message Transmission now taking place from Drone to Ground Station.")
+    print("\nCOMMUNICATION:")
     #Hard coded messages for the drone to transmit mid-flight
     messages = [
         DroneMessage(
@@ -129,7 +127,6 @@ def message_transmission(drone: Drone, gcs: GroundStation) -> None:
         sent_packets.append(packet)
     return sent_packets
 
-
 #Attack simulations
 def simulate_replay_attack(gcs: GroundStation, captured_packet: dict) -> None:
     """
@@ -138,9 +135,8 @@ def simulate_replay_attack(gcs: GroundStation, captured_packet: dict) -> None:
     print("ATTACK SIMULATION 1 - REPLAY ATTACK")
     print("A cryptanalyst has captured packet #1 from the channel and tries re-submitting it to the Ground Station, creating a replay attack.\n")
     attacker = ReplayAttacker()
-    attacker.capture(captured_packet)
+    attacker.capture(captured_packet) #We pass the first packet, which is considered to have been captured by the attacker
     attacker.attack(gcs)
-
 
 def simulate_mitm_attack(drone: Drone, gcs: GroundStation) -> None:
     """
@@ -155,13 +151,11 @@ def simulate_mitm_attack(drone: Drone, gcs: GroundStation) -> None:
     attacker = MITMAttacker(SHARED_PASSWORD)
     attacker.attack(gcs, mission=MISSION_ID)
 
-
 def main() -> None:
     """
     Executes the entire communication system between the drone and the ground station. Also simulates the attacks and shows the
     system's capability to deal with them.
     """
-
     print("SECURE DRONE COMMUNICATION SYSTEM")
     print(f"Drone ID   : {DRONE_ID}")
     print(f"Mission    : {MISSION_ID}")
@@ -172,7 +166,7 @@ def main() -> None:
     ground_station = GroundStation(SHARED_PASSWORD) #Passwords passed to both drone and ground station - assume pre-defined.
 
     #The regular communication flow is executed.
-    print("\nCOMMUNICATION:")
+    print("\nSESSION CREATION:")
     rsa_key_exchange(drone, ground_station)
     drone_gcs_authentication(drone, ground_station)
     key_exchange(drone, ground_station)

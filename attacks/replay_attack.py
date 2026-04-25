@@ -72,12 +72,12 @@ class ReplayAttacker:
             print("[Replay Attacker] Nothing captured yet.")
             return
         sleep(1)
-        print("[Replay Attacker] Re-submitting captured packet to GCS...")
+        print("[Replay Attacker] Re-submitting captured packet to Ground Station...")
         try:
             gcs.receive_message(self.captured_packet)
             print("[Replay Attacker] REPLAY SUCCEEDED - WE BROKE THE SYSTEM !!")
         except SecurityException as exc:
             sleep(1)
-            print(f"\n[GCS] Replay attack BLOCKED: {exc}")
+            print(f"\n[Ground Station] Replay attack BLOCKED: {exc}")
             print("SYSTEM SECURE.\n")
             sleep(1)

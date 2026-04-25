@@ -41,7 +41,6 @@ Classes
 MITMAttacker
 """
 
-import base64
 import os
 from time import sleep
 
@@ -153,18 +152,18 @@ class MITMAttacker:
         ciphertext, aes_nonce = HybridEncryptor.aes_encrypt(plaintext, self.session_key)
         mac = MACHandler.generate(ciphertext + aes_nonce, self.mac_key)
         forged_packet = {
-            "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
-            "aes_nonce": base64.b64encode(aes_nonce).decode("ascii"),
-            "mac": base64.b64encode(mac).decode("ascii"),
-            "signature": base64.b64encode(forged_signature).decode("ascii"),
+            "ciphertext": ciphertext,
+            "aes_nonce": aes_nonce,
+            "mac": mac,
+            "signature": forged_signature,
             "msg_nonce": forged_msg.nonce,
         }
-        print("[MITM Attacker] Submitting forged packet to GCS...")
+        print("[MITM Attacker] Submitting forged packet to Ground Station...")
         sleep(1)
         try:
             gcs.receive_message(forged_packet)
             print("[MITM Attacker] MITM SUCCEEDED - WE BROKE THE SYSTEM !!")
         except SecurityException as exc:
             sleep(1)
-            print(f"\n[GCS] MITM attack BLOCKED: {exc}")
+            print(f"\n[Ground Station] MITM attack BLOCKED: {exc}")
             print("SYSTEM SECURE.")
