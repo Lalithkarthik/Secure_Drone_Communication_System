@@ -72,7 +72,7 @@ class ReplayAttacker:
 
         print("[Replay Attacker] Re-submitting captured packet to GCS...")
         try:
-            gcs.receive_telemetry(self._captured_packet)
+            gcs.receive_message(self._captured_packet)
             # Should never reach here
             print("[Replay Attacker] !! Replay SUCCEEDED — SYSTEM IS VULNERABLE !!")
         except SecurityException as exc:

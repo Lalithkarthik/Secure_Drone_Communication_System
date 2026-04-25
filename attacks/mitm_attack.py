@@ -52,7 +52,7 @@ from tools import (
     DroneStatus,
     HybridEncryptor,
     MACHandler,
-    RSASigner,
+    RSA_Signer,
 )
 
 
@@ -74,7 +74,7 @@ class MITMAttacker:
         self._password = password
 
         # Eve's own RSA keypair — NOT the same as the real Drone's
-        self._rsa_private, self._rsa_public = RSASigner.generate_keypair()
+        self._rsa_private, self._rsa_public = RSA_Signer.generate_keypair()
         self._session_key: bytes | None  = None
         self._mac_key:     bytes | None  = None
 
@@ -147,10 +147,10 @@ class MITMAttacker:
             mission_id= real_drone_mission_id,
         )
         plaintext = forged_msg.to_json().encode("utf-8")
-        print(f"[MITM Attacker] Forged message: {forged_msg.pretty()}")
+        print(f"[MITM Attacker] Forged message: {forged_msg.printer()}")
 
         # -- Step 5: Sign with Eve's own RSA key (NOT the Drone's) --
-        forged_signature = RSASigner.sign(plaintext, self._rsa_private)
+        forged_signature = RSA_Signer.sign(plaintext, self._rsa_private)
         print("[MITM Attacker] Signed with Eve's RSA key (≠ enrolled Drone key).")
 
         # -- Step 6: Encrypt and MAC --
@@ -168,7 +168,7 @@ class MITMAttacker:
         # -- Submit to GCS --
         print("[MITM Attacker] Submitting forged packet to GCS...")
         try:
-            gcs.receive_telemetry(forged_packet)
+            gcs.receive_message(forged_packet)
             print("[MITM Attacker] !! MITM SUCCEEDED — SYSTEM IS VULNERABLE !!")
         except SecurityException as exc:
             print(f"[GCS] ✗ MITM attack BLOCKED: {exc}")

@@ -31,7 +31,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 
 
-class RSASigner:
+class RSA_Signer:
     """
     Stateless helper for RSA-PSS-SHA256 digital signatures.
 
@@ -85,7 +85,7 @@ class RSASigner:
         -------
         PSS signature bytes
         """
-        return private_key.sign(message, RSASigner._PSS, hashes.SHA256())
+        return private_key.sign(message, RSA_Signer._PSS, hashes.SHA256())
 
     @staticmethod
     def verify(message: bytes,
@@ -106,7 +106,7 @@ class RSASigner:
         False — signature is invalid; possible forgery or MITM
         """
         try:
-            public_key.verify(signature, message, RSASigner._PSS, hashes.SHA256())
+            public_key.verify(signature, message, RSA_Signer._PSS, hashes.SHA256())
             return True
         except InvalidSignature:
             return False

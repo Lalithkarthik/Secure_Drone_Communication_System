@@ -55,9 +55,6 @@ class DroneMessage:
     mission_id:  str
     nonce:       str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    # ------------------------------------------------------------------
-    # Serialisation helpers
-    # ------------------------------------------------------------------
 
     def to_json(self) -> str:
         """Serialise the message to a deterministic JSON string."""
@@ -88,14 +85,12 @@ class DroneMessage:
             nonce=       data["nonce"],
         )
 
-    def pretty(self) -> str:
-        """Human-readable summary for logging."""
+    def printer(self) -> str:
         return (
-            f"DroneMessage("
-            f"id={self.drone_id}, "
-            f"pos={self.position}, "
-            f"vel={self.velocity}, "
-            f"battery={self.battery_pct:.1f}%, "
-            f"status={self.status.value}, "
-            f"mission={self.mission_id})"
+            f"\n    id      : {self.drone_id} "
+            f"\n    pos     : {self.position} "
+            f"\n    vel     : {self.velocity}"
+            f"\n    battery : {self.battery_pct:.1f}%"
+            f"\n    status  : {self.status.value}"
+            f"\n    mission : {self.mission_id})"
         )

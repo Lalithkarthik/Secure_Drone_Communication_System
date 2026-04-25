@@ -38,7 +38,7 @@ from tools import (
     MACHandler,
     NonceManager,
     PasswordStore,
-    RSASigner,
+    RSA_Signer,
 )
 
 
@@ -71,7 +71,7 @@ class GroundStation:
         self._pw_salt, self._pw_hash = self._pw_store.hash_password(password)
 
         # Long-term RSA identity keypair
-        self._rsa_private, self._rsa_public = RSASigner.generate_keypair()
+        self._rsa_private, self._rsa_public = RSA_Signer.generate_keypair()
 
         # CHAP authenticator
         self._chap = CHAPAuthenticator()
@@ -185,7 +185,7 @@ class GroundStation:
     # Phase 4 — Receive and Validate Telemetry
     # ------------------------------------------------------------------
 
-    def receive_telemetry(self, packet: dict) -> DroneMessage:
+    def receive_message(self, packet: dict) -> DroneMessage:
         """
         Validate and decrypt an incoming telemetry packet.
 
@@ -242,7 +242,7 @@ class GroundStation:
         # -- Check 4: RSA-PSS digital signature --
         if self._drone_rsa_public is None:
             raise SecurityException("No drone RSA public key enrolled.")
-        if not RSASigner.verify(plaintext, signature, self._drone_rsa_public):
+        if not RSA_Signer.verify(plaintext, signature, self._drone_rsa_public):
             raise SecurityException(
                 "RSA signature verification FAILED — possible forgery or MITM attack."
             )
@@ -250,5 +250,5 @@ class GroundStation:
 
         # All checks passed — deserialise and return
         message = DroneMessage.from_json(plaintext.decode("utf-8"))
-        print(f"[GCS] Telemetry accepted: {message.pretty()}")
+        print(f"[GCS] Telemetry accepted: {message.printer()}")
         return message

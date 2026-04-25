@@ -27,6 +27,7 @@ Phase 4 — Telemetry Transmission
 
 import base64
 import os
+from time import sleep
 
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
@@ -36,7 +37,7 @@ from tools import (
     DroneMessage,
     HybridEncryptor,
     MACHandler,
-    RSASigner,
+    RSA_Signer,
 )
 
 
@@ -51,36 +52,33 @@ class Drone:
     """
 
     def __init__(self, drone_id: str, password: str):
-        self.drone_id  = drone_id
-        self._password = password
+        self.drone_id = drone_id
+        self.password = password
+        print(f"Starting up the Drone {drone_id}...")
+        sleep(1)
 
-        # Long-term RSA identity keypair
-        self._rsa_private, self._rsa_public = RSASigner.generate_keypair()
+        print("Generating Drone's RSA public and private keys...")
+        sleep(1) 
+        self.rsa_private_key, self.rsa_public_key = RSA_Signer.generate_keypair() #Generates its own RSA public and private keys
+        print(f"Generated Drone {drone_id}'s RSA keys successfully.")
 
-        # Session state (populated during the handshake)
-        self._gcs_rsa_public: RSAPublicKey | None = None
-        self._dh_party:    DHParty | None = None
-        self._session_key: bytes   | None = None
-        self._mac_key:     bytes   | None = None
+        #The following variables are populated during the system simulation
+        self.gcs_public: RSAPublicKey | None = None
+        self.dh: DHParty | None = None
+        self.aes_session_key: bytes | None = None
+        self.mac_key: bytes | None = None
 
-        print(f"[Drone {self.drone_id}] Initialised — RSA-2048 keypair generated.")
-
-    # ------------------------------------------------------------------
-    # Key provisioning (pre-mission)
-    # ------------------------------------------------------------------
+        print(f"[Drone {self.drone_id} reporting] En route the Mission.")
 
     def get_public_rsa_key(self) -> RSAPublicKey:
-        """Return this drone's RSA public key for enrolment with the GCS."""
-        return self._rsa_public
+        """Returns Drone's RSA public key for the Ground Station to use."""
+        return self.rsa_public_key
 
     def set_gcs_public_key(self, gcs_public_key: RSAPublicKey) -> None:
         """
-        Store the GCS's RSA public key.
-
-        In a real system this would be provisioned by a Certificate Authority
-        before the drone is deployed.
+        Obtains the Ground Station's RSA public key and stores it.
         """
-        self._gcs_rsa_public = gcs_public_key
+        self.gcs_public = gcs_public_key
         print(f"[Drone {self.drone_id}] GCS RSA public key stored.")
 
     # ------------------------------------------------------------------
@@ -94,7 +92,7 @@ class Drone:
         Response = HMAC-SHA256(key=password, msg=challenge)
         The password is never transmitted.
         """
-        response = CHAPAuthenticator.compute_response(challenge, self._password)
+        response = CHAPAuthenticator.compute_response(challenge, self.password)
         print(f"[Drone {self.drone_id}] CHAP response computed.")
         return response
 
@@ -108,8 +106,8 @@ class Drone:
 
         Must be called before complete_dh().
         """
-        self._dh_party = DHParty()
-        pub = self._dh_party.get_public_int()
+        self.dh = DHParty()
+        pub = self.dh.get_public_int()
         print(f"[Drone {self.drone_id}] DH keypair generated.")
         return pub
 
@@ -120,10 +118,10 @@ class Drone:
         Derives a 32-byte shared key; uses the first 16 bytes as the MAC key.
         The remaining bytes are available if needed for additional key material.
         """
-        if self._dh_party is None:
+        if self.dh is None:
             raise RuntimeError("Call init_dh() before complete_dh().")
-        derived       = self._dh_party.derive_shared_key(gcs_dh_public)
-        self._mac_key = derived[:16]
+        derived       = self.dh.derive_shared_key(gcs_dh_public)
+        self.mac_key = derived[:16]
         print(f"[Drone {self.drone_id}] DH exchange complete — MAC key derived.")
 
     # ------------------------------------------------------------------
@@ -137,12 +135,12 @@ class Drone:
 
         Only the GCS, with its RSA private key, can recover the session key.
         """
-        if self._gcs_rsa_public is None:
+        if self.gcs_public is None:
             raise RuntimeError("GCS RSA public key not set.")
 
-        self._session_key  = os.urandom(32)
+        self.aes_session_key  = os.urandom(32)
         encrypted_key      = HybridEncryptor.rsa_encrypt_key(
-            self._session_key, self._gcs_rsa_public
+            self.aes_session_key, self.gcs_public
         )
         print(f"[Drone {self.drone_id}] AES-256 session key generated and RSA-wrapped.")
         return encrypted_key
@@ -151,7 +149,7 @@ class Drone:
     # Phase 4 — Secure Telemetry Transmission
     # ------------------------------------------------------------------
 
-    def send_telemetry(self, message: DroneMessage) -> dict:
+    def send_message(self, message: DroneMessage) -> dict:
         """
         Package a DroneMessage into a secure, authenticated packet.
 
@@ -172,22 +170,22 @@ class Drone:
         -------
         dict with keys: ciphertext, aes_nonce, mac, signature, msg_nonce
         """
-        if self._session_key is None:
+        if self.aes_session_key is None:
             raise RuntimeError("Session key not set — complete key exchange first.")
-        if self._mac_key is None:
+        if self.mac_key is None:
             raise RuntimeError("MAC key not set — complete DH exchange first.")
 
         # Step 1: Serialise
         plaintext = message.to_json().encode("utf-8")
 
         # Step 2: Sign plaintext (RSA-PSS-SHA256)
-        signature = RSASigner.sign(plaintext, self._rsa_private)
+        signature = RSA_Signer.sign(plaintext, self.rsa_private_key)
 
         # Step 3: Encrypt with AES-256-CTR
-        ciphertext, aes_nonce = HybridEncryptor.aes_encrypt(plaintext, self._session_key)
+        ciphertext, aes_nonce = HybridEncryptor.aes_encrypt(plaintext, self.aes_session_key)
 
         # Step 4: MAC over ciphertext || aes_nonce  (Encrypt-then-MAC)
-        mac_tag = MACHandler.generate(ciphertext + aes_nonce, self._mac_key)
+        mac_tag = MACHandler.generate(ciphertext + aes_nonce, self.mac_key)
 
         packet = {
             "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
