@@ -23,47 +23,19 @@ MACHandler — stateless; all methods are static helpers.
 import hashlib
 import hmac
 
-
 class MACHandler:
-    """
-    Stateless HMAC-SHA256 helper for message integrity verification.
-
-    All methods are static — instantiation is not required.
-    """
-
     @staticmethod
     def generate(message: bytes, key: bytes) -> bytes:
         """
-        Compute HMAC-SHA256 of message under key.
-
-        Parameters
-        ----------
-        message : bytes to authenticate (typically ciphertext + aes_nonce)
-        key     : secret MAC key (derived from DH shared secret)
-
-        Returns
-        -------
-        32-byte HMAC tag
+        Computes the MAC of the message using a key shared using Diffie-Hellman technique.
         """
         return hmac.new(key, message, hashlib.sha256).digest()
 
     @staticmethod
     def verify(message: bytes, key: bytes, tag: bytes) -> bool:
         """
-        Verify an HMAC-SHA256 tag in constant time.
-
-        Constant-time comparison prevents timing side-channel attacks —
-        the comparison never short-circuits on the first mismatched byte.
-
-        Parameters
-        ----------
-        message : the bytes that were authenticated
-        key     : the same secret MAC key
-        tag     : the received HMAC tag to check
-
-        Returns
-        -------
-        True if valid; False if the message or tag was tampered with
+        Verifies the message and it's corresponding MAC to ensure message integrity. Any mismatch between the message and its message
+        leads to a belief that the message has been tampered with and its integrity has been compromised with malicious intentions.
         """
         expected = MACHandler.generate(message, key)
         return hmac.compare_digest(expected, tag)

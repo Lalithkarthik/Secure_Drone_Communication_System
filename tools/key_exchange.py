@@ -124,9 +124,7 @@ class DHParty:
 
     @property
     def shared_key(self) -> bytes:
-        """The derived 32-byte key. Available after derive_shared_key()."""
+        """The derived key is returned and shared as needed."""
         if self._shared_key is None:
-            raise RuntimeError(
-                "derive_shared_key() has not been called yet."
-            )
+            raise RuntimeError("derive_shared_key() has not been called yet.")
         return self._shared_key

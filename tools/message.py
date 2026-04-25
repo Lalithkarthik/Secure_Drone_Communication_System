@@ -24,40 +24,34 @@ from typing import Tuple
 
 
 class DroneStatus(Enum):
-    """Operational states the drone can report."""
-    FLYING    = "FLYING"
-    HOVERING  = "HOVERING"
-    LANDING   = "LANDING"
+    """
+    Operational states the drone can report. In this implementation, it is treated as the most critical part of the Drone message. For 
+    example, a tampered message showing "LANDING" instead of "FLYING" is assumed to have devastating affects, leading to complete mission
+    and security failure.
+    """
+    FLYING = "FLYING"
+    HOVERING = "HOVERING"
+    LANDING = "LANDING"
     RETURNING = "RETURNING"
-
 
 @dataclass
 class DroneMessage:
     """
-    One telemetry packet from the Drone.
-
-    Attributes
-    ----------
-    drone_id    : unique drone identifier string
-    position    : (x, y, z) in metres, relative to GCS origin (0, 0, 0)
-    velocity    : (vx, vy, vz) velocity components in m/s
-    battery_pct : remaining battery as a float 0–100
-    status      : current DroneStatus enum value
-    mission_id  : mission this packet belongs to
-    nonce       : auto-generated UUID4 — ensures every packet is unique
-    """
-
-    drone_id:    str
-    position:    Tuple[float, float, float]
-    velocity:    Tuple[float, float, float]
+    Class defined for a complete packet from the Drone
+    """ 
+    drone_id: str #Identity of the drone
+    position: Tuple[float, float, float]
+    velocity: Tuple[float, float, float]
     battery_pct: float
-    status:      DroneStatus
-    mission_id:  str
-    nonce:       str = field(default_factory=lambda: str(uuid.uuid4()))
+    status: DroneStatus #Treated as the most critical value in the packet
+    mission_id: str
+    nonce: str = field(default_factory=lambda: str(uuid.uuid4())) #Randomly generate nonce to deal with replay attacks
 
 
     def to_json(self) -> str:
-        """Serialise the message to a deterministic JSON string."""
+        """
+        Serialise the message to a deterministic JSON string.
+        """
         return json.dumps(
             {
                 "drone_id":    self.drone_id,
@@ -73,19 +67,24 @@ class DroneMessage:
 
     @classmethod
     def from_json(cls, json_str: str) -> "DroneMessage":
-        """Deserialise a DroneMessage from a JSON string."""
+        """
+        Deserialise a DroneMessage from a JSON string.
+        """
         data = json.loads(json_str)
         return cls(
-            drone_id=    data["drone_id"],
-            position=    tuple(data["position"]),
-            velocity=    tuple(data["velocity"]),
-            battery_pct= data["battery_pct"],
-            status=      DroneStatus(data["status"]),
-            mission_id=  data["mission_id"],
-            nonce=       data["nonce"],
+            drone_id = data["drone_id"],
+            position = tuple(data["position"]),
+            velocity = tuple(data["velocity"]),
+            battery_pct = data["battery_pct"],
+            status = DroneStatus(data["status"]),
+            mission_id = data["mission_id"],
+            nonce = data["nonce"],
         )
 
     def printer(self) -> str:
+        """
+        Helper to print the entire Drone message in a standard format.
+        """
         return (
             f"\n    id      : {self.drone_id} "
             f"\n    pos     : {self.position} "

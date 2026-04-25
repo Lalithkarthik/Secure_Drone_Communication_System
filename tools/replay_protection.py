@@ -1,7 +1,7 @@
 """
 tools/replay_protection.py
 ==========================
-Replay Attack Protection — Nonce Registry
+Replay Attack Protection - Nonce Registry
 
 How it works
 ------------
@@ -13,7 +13,7 @@ nonce is immediately rejected.
 UUID4 uniqueness
 ----------------
 A UUID4 is 122 bits of cryptographic randomness.  The probability of
-a collision across 1 billion messages is approximately 6 × 10⁻¹⁹ —
+a collision across 1 billion messages is approximately 6 × 10⁻¹⁹ -
 effectively impossible in practice.
 
 Thread safety
@@ -23,64 +23,36 @@ be shared safely across threads.
 
 Classes
 -------
-NonceManager — one instance per GCS session.
+NonceManager - one instance per GCS session.
 """
 
 import uuid
 from threading import Lock
 
-
 class NonceManager:
     """
-    Tracks nonces seen in the current session to detect replayed packets.
-
-    A nonce is accepted (returns True) the first time it is registered.
-    Any later registration of the same nonce returns False — the caller
-    should treat this as a replay attack and reject the message.
+    Tracks nonces seen in the current session so far and ensures that there are no repetitions. It works to detect replayed packets and
+    preventing Replay attacks.
     """
-
     def __init__(self):
-        self._seen: set[str] = set()
-        self._lock = Lock()
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+        self.seen: set[str] = set()
+        self.lock = Lock()
 
     @staticmethod
     def generate_nonce() -> str:
         """
-        Generate a fresh cryptographically-random UUID4 nonce string.
-
-        This is called by the Drone when building a new DroneMessage.
+        Generates a fresh random nonce string, which is called by the Drone everytime it builds a new message of "DroneMessage" class.
         """
         return str(uuid.uuid4())
 
     def register_nonce(self, nonce: str) -> bool:
         """
-        Attempt to register a nonce from an incoming message.
-
-        Parameters
-        ----------
-        nonce : nonce string extracted from the packet
-
-        Returns
-        -------
-        True  — nonce is fresh; message should be processed
-        False — nonce already seen; REPLAY ATTACK — reject message
+        Attempt to register a nonce from an incoming message. It is successful if the nonce is fresh, else, if it has already been seen 
+        within the session, it is considered to be a potential replay attack and the message is rejected, before raising an alarm of the 
+        potential security breach in communications.
         """
-        with self._lock:
-            if nonce in self._seen:
+        with self.lock:
+            if nonce in self.seen:
                 return False
-            self._seen.add(nonce)
+            self.seen.add(nonce)
             return True
-
-    def reset(self):
-        """Clear all stored nonces — useful for testing."""
-        with self._lock:
-            self._seen.clear()
-
-    @property
-    def seen_count(self) -> int:
-        """Number of nonces registered in this session."""
-        return len(self._seen)

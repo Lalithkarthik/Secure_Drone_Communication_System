@@ -5,7 +5,7 @@ CHAP-style Challenge–Response Authentication
 
 Protocol (mirrors PPP-CHAP, RFC 1994)
 --------------------------------------
-1. GCS (authenticator) calls generate_challenge() → 16 random bytes → sends to Drone
+1. GCS (authenticator) calls generatechallenge() → 16 random bytes → sends to Drone
 2. Drone calls compute_response(challenge, password) → HMAC-SHA256(key=password, msg=challenge)
 3. GCS calls verify_response(response, password)    → recomputes and compares in constant time
 
@@ -13,12 +13,12 @@ Why CHAP?
 ---------
 The password is NEVER transmitted in the clear.  An eavesdropper
 who captures the challenge and response cannot derive the password
-without breaking HMAC-SHA256.  The challenge is single-use — the GCS
+without breaking HMAC-SHA256.  The challenge is single-use - the GCS
 clears it immediately after a verification attempt, preventing re-use.
 
 Password storage (PasswordStore)
 ---------------------------------
-On-disk passwords are stored as  SHA-256(salt || password) — never
+On-disk passwords are stored as  SHA-256(salt || password) - never
 as plaintext.  This class is used to demonstrate secure storage
 best-practices in the system design, and is used at enrolment time.
 
@@ -51,7 +51,7 @@ class PasswordStore:
 
         Returns
         -------
-        (salt, sha256_digest)  — store both; salt is not secret
+        (salt, sha256_digest)  - store both; salt is not secret
         """
         salt   = os.urandom(16)
         digest = hashlib.sha256(salt + password.encode("utf-8")).digest()
@@ -79,11 +79,7 @@ class CHAPAuthenticator:
     """
 
     def __init__(self):
-        self._challenge: bytes | None = None
-
-    # ------------------------------------------------------------------
-    # GCS side
-    # ------------------------------------------------------------------
+        self.challenge: bytes | None = None
 
     def generate_challenge(self) -> bytes:
         """
@@ -91,8 +87,8 @@ class CHAPAuthenticator:
 
         The challenge is stored internally until verify_response() is called.
         """
-        self._challenge = os.urandom(16)
-        return self._challenge
+        self.challenge = os.urandom(16)
+        return self.challenge
 
     def verify_response(self, response: bytes, password: str) -> bool:
         """
@@ -111,17 +107,13 @@ class CHAPAuthenticator:
         -----------
         Clears the active challenge regardless of outcome (single-use).
         """
-        if self._challenge is None:
+        if self.challenge is None:
             raise RuntimeError(
-                "No active challenge — call generate_challenge() first."
+                "No active challenge - call generate_challenge() first."
             )
-        expected        = CHAPAuthenticator._compute_hmac(self._challenge, password)
-        self._challenge = None      # invalidate immediately — prevents reuse
+        expected = CHAPAuthenticator.compute_mac(self.challenge, password)
+        self.challenge = None      # invalidate immediately - prevents reuse
         return hmac.compare_digest(expected, response)
-
-    # ------------------------------------------------------------------
-    # Drone side (static — no state needed)
-    # ------------------------------------------------------------------
 
     @staticmethod
     def compute_response(challenge: bytes, password: str) -> bytes:
@@ -130,16 +122,8 @@ class CHAPAuthenticator:
 
         Called by the Drone upon receiving a challenge from the GCS.
         """
-        return CHAPAuthenticator._compute_hmac(challenge, password)
-
-    # ------------------------------------------------------------------
-    # Internal
-    # ------------------------------------------------------------------
+        return CHAPAuthenticator.compute_mac(challenge, password)
 
     @staticmethod
-    def _compute_hmac(challenge: bytes, password: str) -> bytes:
-        return hmac.new(
-            password.encode("utf-8"),
-            challenge,
-            hashlib.sha256,
-        ).digest()
+    def compute_mac(challenge: bytes, password: str) -> bytes:
+        return hmac.new(password.encode("utf-8"), challenge, hashlib.sha256).digest()
