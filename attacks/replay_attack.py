@@ -28,6 +28,7 @@ ReplayAttacker
 """
 
 import copy
+from time import sleep
 
 from ground_station import GroundStation, SecurityException
 
@@ -73,7 +74,8 @@ class ReplayAttacker:
         print("[Replay Attacker] Re-submitting captured packet to GCS...")
         try:
             gcs.receive_message(self._captured_packet)
-            # Should never reach here
-            print("[Replay Attacker] !! Replay SUCCEEDED — SYSTEM IS VULNERABLE !!")
+            print("[Replay Attacker] REPLAY SUCCEEDED - WE BROKE THE SYSTEM !!")
         except SecurityException as exc:
-            print(f"[GCS] ✗ Replay attack BLOCKED: {exc}")
+            print(f"\n[GCS] Replay attack BLOCKED: {exc}")
+            print("SYSTEM SECURE.\n\n")
+            sleep(1)

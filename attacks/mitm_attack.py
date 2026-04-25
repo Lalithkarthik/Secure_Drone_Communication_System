@@ -43,6 +43,7 @@ MITMAttacker
 
 import base64
 import os
+from time import sleep
 
 from ground_station import GroundStation, SecurityException
 from tools import (
@@ -71,18 +72,18 @@ class MITMAttacker:
         ----------
         password : the pre-shared CHAP password (attacker has obtained this)
         """
-        self._password = password
+        self.password = password #Same as the password shared between Drone and Ground Station, which the cryptanalyst has figured out.
 
-        # Eve's own RSA keypair — NOT the same as the real Drone's
-        self._rsa_private, self._rsa_public = RSA_Signer.generate_keypair()
-        self._session_key: bytes | None  = None
-        self._mac_key:     bytes | None  = None
+        #Cryptanalyst creates and uses her own RSA keys
+        self.rsa_private_key, self.rsa_public_key = RSA_Signer.generate_keypair()
 
+        #Cryptanalyst does not have access to the AES session key, or the key to generate the MAC+
+        self.session_key: bytes | None  = None
+        self.mac_key: bytes | None  = None
+        sleep(1)
         print("[MITM Attacker] Initialised with own RSA keypair.")
 
-    def attack(self,
-               gcs: GroundStation,
-               real_drone_mission_id: str = "MISSION_ALPHA_001") -> None:
+    def attack(self, gcs: GroundStation, mission: str) -> None:
         """
         Attempt a full MITM impersonation of the Drone.
 
@@ -101,74 +102,68 @@ class MITMAttacker:
         Parameters
         ----------
         gcs                   : the target GroundStation
-        real_drone_mission_id : mission ID to embed in the forged message
+        mission : mission ID to embed in the forged message
         """
         print("[MITM Attacker] Starting impersonation of Drone...")
-
-        # -- Step 1: CHAP Authentication --
-        # Eve knows the password and can respond correctly.
-        # CHAP only proves "I know the password" — it does NOT prove RSA identity.
+        #Cryptanalyst knows the password, so can successfully authenticate with the ground station, posing as the drone
         challenge = gcs.issue_challenge()
-        response  = CHAPAuthenticator.compute_response(challenge, self._password)
-        auth_ok   = gcs.verify_challenge_response(response)
+        response = CHAPAuthenticator.compute_response(challenge, self.password)
+        auth_ok = gcs.verify_challenge_response(response)
         if not auth_ok:
             print("[MITM Attacker] CHAP failed — cannot proceed.")
             return
+        sleep(1)
         print("[MITM Attacker] CHAP passed (password known). Proceeding...")
 
-        # -- Step 2: DH Key Exchange (using Eve's own DH keys) --
-        eve_dh      = DHParty()
-        eve_dh_pub  = eve_dh.get_public_int()
-        gcs_dh_pub  = gcs.init_dh()
+        #Cryptanalyst proceeds to exchange her own keys with the Ground Station
+        cryptanalyst_dh = DHParty()
+        cryptanalyst_dh_public  = cryptanalyst_dh.get_public_int()
+        gcs_dh_public = gcs.init_dh()
+        gcs.complete_dh(cryptanalyst_dh_public) #GCS unknowingly exchanges keys with the cryptanalyst, assuming the identity to be the drone.
+        mac_key_derived = cryptanalyst_dh.derive_shared_key(gcs_dh_public)
+        self.mac_key = mac_key_derived[:16] #Using this, the cryptanalyst successfully derives the key for MAC
+        sleep(1)
+        print("[MITM Attacker] DH exchange complete. Now has the key for the MAC.")
 
-        # GCS derives shared secret with Eve (thinking it is the real Drone)
-        gcs.complete_dh(eve_dh_pub)
-
-        # Eve derives her shared secret with the GCS
-        eve_derived   = eve_dh.derive_shared_key(gcs_dh_pub)
-        self._mac_key = eve_derived[:16]
-        print("[MITM Attacker] DH exchange complete (GCS shares key with Eve, not real Drone).")
-
-        # -- Step 3: Session Key (Eve generates her own) --
-        self._session_key = os.urandom(32)
-        enc_key = HybridEncryptor.rsa_encrypt_key(
-            self._session_key, gcs.get_public_rsa_key()
-        )
+        #Cryptanalyst proceeds to create a fake AES session key and share it with the GCS
+        self.session_key = os.urandom(32)
+        enc_key = HybridEncryptor.rsa_encrypt_key(self.session_key, gcs.get_public_rsa_key())
         gcs.receive_session_key(enc_key)
-        print("[MITM Attacker] Forged session key sent to GCS.")
+        sleep(1)
+        print("[MITM Attacker] Fake AES session key sent to GCS.")
 
-        # -- Step 4: Forge a DroneMessage --
+        #Now, cryptanalyst forges messages to seem they are from the drone. The message gives the information of forged "landing" command, and maliciously gives 
+        #incorrect information of the sensitive "Drone Status" to the Ground Station.
         forged_msg = DroneMessage(
-            drone_id=   "DR001",                        # pretend to be real drone
-            position=   (50.0, 50.0, 10.0),
-            velocity=   (0.0, 0.0, -5.0),               # forged "landing" command
-            battery_pct=99.0,
-            status=     DroneStatus.LANDING,            # malicious status injection
-            mission_id= real_drone_mission_id,
+            drone_id = "DR001",                 
+            position = (50.0, 50.0, 10.0),
+            velocity = (0.0, 0.0, -5.0),             
+            battery_pct = 99.0,
+            status = DroneStatus.LANDING,  
+            mission_id = mission,
         )
         plaintext = forged_msg.to_json().encode("utf-8")
-        print(f"[MITM Attacker] Forged message: {forged_msg.printer()}")
+        sleep(1)
+        print(f"[MITM Attacker] Forged message ready: {forged_msg.printer()}")
 
-        # -- Step 5: Sign with Eve's own RSA key (NOT the Drone's) --
-        forged_signature = RSA_Signer.sign(plaintext, self._rsa_private)
-        print("[MITM Attacker] Signed with Eve's RSA key (≠ enrolled Drone key).")
-
-        # -- Step 6: Encrypt and MAC --
-        ciphertext, aes_nonce = HybridEncryptor.aes_encrypt(plaintext, self._session_key)
-        mac_tag = MACHandler.generate(ciphertext + aes_nonce, self._mac_key)
-
+        #Cryptanalyst continues the normal communication flow of signing with it's own RSA key, encrypting and applying MAC correctly and submit to the GCS
+        forged_signature = RSA_Signer.sign(plaintext, self.rsa_private_key)
+        sleep(1)
+        print("[MITM Attacker] Digital signature with own RSA key (not the same as enrolled Drone key).") #This is the reason due to which the GCS is able to identify the attack
+        ciphertext, aes_nonce = HybridEncryptor.aes_encrypt(plaintext, self.session_key)
+        mac = MACHandler.generate(ciphertext + aes_nonce, self.mac_key)
         forged_packet = {
             "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
-            "aes_nonce":  base64.b64encode(aes_nonce).decode("ascii"),
-            "mac":        base64.b64encode(mac_tag).decode("ascii"),
-            "signature":  base64.b64encode(forged_signature).decode("ascii"),
-            "msg_nonce":  forged_msg.nonce,
+            "aes_nonce": base64.b64encode(aes_nonce).decode("ascii"),
+            "mac": base64.b64encode(mac).decode("ascii"),
+            "signature": base64.b64encode(forged_signature).decode("ascii"),
+            "msg_nonce": forged_msg.nonce,
         }
-
-        # -- Submit to GCS --
         print("[MITM Attacker] Submitting forged packet to GCS...")
+        sleep(1)
         try:
             gcs.receive_message(forged_packet)
-            print("[MITM Attacker] !! MITM SUCCEEDED — SYSTEM IS VULNERABLE !!")
+            print("[MITM Attacker] MITM SUCCEEDED - WE BROKE THE SYSTEM !!")
         except SecurityException as exc:
-            print(f"[GCS] ✗ MITM attack BLOCKED: {exc}")
+            print(f"\n[GCS] MITM attack BLOCKED: {exc}")
+            print("SYSTEM SECURE.")

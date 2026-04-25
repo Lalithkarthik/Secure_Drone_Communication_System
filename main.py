@@ -142,7 +142,7 @@ def simulate_replay_attack(gcs: GroundStation, captured_packet: dict) -> None:
     attacker.attack(gcs)
 
 
-def simulate_mitm_attack() -> None:
+def simulate_mitm_attack(drone: Drone, gcs: GroundStation) -> None:
     """
     Simulates the Man-in-the-Middle attack
     """
@@ -150,18 +150,11 @@ def simulate_mitm_attack() -> None:
     print("A cryptanalyst figured out the CHAP password and intercepts the DH exchange. She substitutes her own DH keys and forges a " \
         "new packet, signing it with her own RSA key (Drone's RSA key has not been figured out), and sends it.\n")
 
-    # Fresh GCS with the REAL drone's public key enrolled
-    real_drone = Drone(DRONE_ID, SHARED_PASSWORD)
-    fresh_gcs = GroundStation(SHARED_PASSWORD)
-
-    # Pre-mission: GCS enrolls the real drone's RSA public key
-    fresh_gcs.enroll_drone_public_key(real_drone.get_public_rsa_key())
-    print(f"\n  [Setup] Fresh GCS created; real Drone '{DRONE_ID}' RSA key enrolled.")
-    print("  [Setup] Cryptanalyst begins impersonation...\n")
-
-    # Eve knows the password, has her own RSA keypair, and intercepts DH
+    #We take the existing Ground Station and Drone and use them directly, but under the setup that the cryptanalyst is now executing a 
+    #mitm attack, by placing herself in the midst of the drone and the ground station.
+    print("Cryptanalyst successfully begins impersonation by putting herself as an intermediary between the drone and the ground station...\n")
     attacker = MITMAttacker(SHARED_PASSWORD)
-    attacker.attack(fresh_gcs, real_drone_mission_id=MISSION_ID)
+    attacker.attack(gcs, mission=MISSION_ID)
 
 
 def main() -> None:
@@ -190,7 +183,7 @@ def main() -> None:
 
     #Both replay and mitm attacks are simulated.
     simulate_replay_attack(ground_station, packets[0]) #Replay attack is simulated using the first accepted packet, which is assumed to be known to cryptanalyst.
-    simulate_mitm_attack()
+    simulate_mitm_attack(drone, ground_station)
 
 if __name__ == "__main__":
     main()
