@@ -149,7 +149,6 @@ def simulate_mitm_attack(drone: Drone, gcs: GroundStation) -> None:
     print("ATTACK SIMULATION 2 - MAN-IN-THE-MIDDLE ATTACK")
     print("A cryptanalyst figured out the CHAP password and intercepts the DH exchange. She substitutes her own DH keys and forges a " \
         "new packet, signing it with her own RSA key (Drone's RSA key has not been figured out), and sends it.\n")
-
     #We take the existing Ground Station and Drone and use them directly, but under the setup that the cryptanalyst is now executing a 
     #mitm attack, by placing herself in the midst of the drone and the ground station.
     print("Cryptanalyst successfully begins impersonation by putting herself as an intermediary between the drone and the ground station...\n")

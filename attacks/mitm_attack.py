@@ -165,5 +165,6 @@ class MITMAttacker:
             gcs.receive_message(forged_packet)
             print("[MITM Attacker] MITM SUCCEEDED - WE BROKE THE SYSTEM !!")
         except SecurityException as exc:
+            sleep(1)
             print(f"\n[GCS] MITM attack BLOCKED: {exc}")
             print("SYSTEM SECURE.")

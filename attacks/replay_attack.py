@@ -27,7 +27,6 @@ ReplayAttacker
     attack(gcs)       : replays the captured packet at the GCS
 """
 
-import copy
 from time import sleep
 
 from ground_station import GroundStation, SecurityException
@@ -42,7 +41,8 @@ class ReplayAttacker:
     """
 
     def __init__(self):
-        self._captured_packet: dict | None = None
+        self.captured_packet: dict | None = None
+        sleep(1)
         print("[Replay Attacker] Initialised.")
 
     def capture(self, packet: dict) -> None:
@@ -53,7 +53,8 @@ class ReplayAttacker:
         ----------
         packet : a packet dict that was previously accepted by the GCS
         """
-        self._captured_packet = copy.deepcopy(packet)
+        self.captured_packet = packet
+        sleep(1)
         print("[Replay Attacker] Packet captured from the channel.")
 
     def attack(self, gcs: GroundStation) -> None:
@@ -67,15 +68,16 @@ class ReplayAttacker:
         ----------
         gcs : the target GroundStation instance
         """
-        if self._captured_packet is None:
+        if self.captured_packet is None:
             print("[Replay Attacker] Nothing captured yet.")
             return
-
+        sleep(1)
         print("[Replay Attacker] Re-submitting captured packet to GCS...")
         try:
-            gcs.receive_message(self._captured_packet)
+            gcs.receive_message(self.captured_packet)
             print("[Replay Attacker] REPLAY SUCCEEDED - WE BROKE THE SYSTEM !!")
         except SecurityException as exc:
+            sleep(1)
             print(f"\n[GCS] Replay attack BLOCKED: {exc}")
-            print("SYSTEM SECURE.\n\n")
+            print("SYSTEM SECURE.\n")
             sleep(1)
