@@ -1,5 +1,5 @@
 """
-tools/replay_protection.py
+replay_protection.py
 ==========================
 Replay Attack Protection - Nonce Registry
 

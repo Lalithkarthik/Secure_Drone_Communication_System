@@ -1,29 +1,20 @@
 """
-tools/encryption.py
-===================
-Hybrid Encryption: RSA-OAEP  +  AES-256-CTR
+encryption.py
 
-Why hybrid?
------------
-RSA is computationally expensive and can only encrypt small payloads.
-AES-CTR is fast and handles arbitrary-length data.
-The hybrid scheme combines the key-distribution strength of RSA with
-the throughput of AES:
-    1. Drone generates a fresh random AES-256 session key.
-    2. Drone encrypts the session key with the GCS's RSA public key.
-    3. Drone encrypts the actual telemetry data with AES-256-CTR.
-    4. GCS decrypts the session key with its RSA private key.
-    5. GCS decrypts the telemetry data with the recovered session key.
-
-AES-CTR mode
-------------
-CTR (Counter) mode turns AES into a stream cipher — no padding required,
-and every 16-byte block is encrypted independently.  A fresh 16-byte
-nonce is generated per message and transmitted alongside the ciphertext.
-
-Classes
--------
-HybridEncryptor — stateless; all methods are static helpers.
+This file goes through the entire procedure of encryption of a message, and also the corresponding decryption. It follows a hybrid
+encryption scheme, combining both AES and RSA techniques, trying to get the best of both symmetric and asymmetrics cryptographic
+techniques. The procedure followed is:
+1. RSA public keys of Drone and Ground Station are assumed to be shared with each other before proceeding.
+2. The Drone generates an AES session key and encrypts it using the RSA public key of the Ground Station, upon which this message is
+transmitted to the ground station.
+4. The Ground Station decrypts the session key using its own RSA private key.
+5. It then proceeds to use this decrypted AES session key to decrypt the ciphertext in order to obtain the plaintext.
+RSA, an asymmetric key algorithm, although has advantages in terms of a few security and key sharing aspects, is extremely expensive to
+implement, even more so in a continuous, long communication, like in the given scenario. A symmetric key technique like AES is significantly
+better, faster and more efficient, but suffers from key-exchange disadvantages. Therefore, applying a hybrid implementation of cryptographic
+techniques, by using RSA to encrypt only the actual AES key, which is used for encryption the plaintext message, is the best method, effectively
+using advantages of both techniques. In this implementation, we are using the AES counter (CTR) mode, which is generally considered to be 
+the best operating mode of block ciphers.
 """
 
 import os
@@ -33,7 +24,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import hashes
 
 class HybridEncryptor:
-    # OAEP padding used for RSA encryption/decryption of the AES key - CHECK HERE
+    #OAEP is a commonly used padding configuration used for RSA encryption/decryption of the AES key
     OAEP = asym_padding.OAEP(mgf=asym_padding.MGF1(algorithm=hashes.SHA256()),  algorithm=hashes.SHA256(), label=None)
 
     @staticmethod

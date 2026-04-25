@@ -1,7 +1,7 @@
 """
-tools/message.py
+message.py
 ================
-DroneMessage — the telemetry payload sent from the Drone to the GCS.
+DroneMessage - the telemetry payload sent from the Drone to the GCS.
 
 Coordinate system
 -----------------
@@ -13,7 +13,7 @@ Replay protection
 -----------------
 Every message carries a UUID4 nonce generated at construction time.
 The GCS's NonceManager checks this nonce is unseen before accepting the message.
-Timestamps are intentionally omitted — nonce-based replay protection is used instead.
+Timestamps are intentionally omitted - nonce-based replay protection is used instead.
 """
 
 import json

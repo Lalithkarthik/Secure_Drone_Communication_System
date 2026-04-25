@@ -1,40 +1,17 @@
 """
-tools/authentication.py
-=======================
-CHAP-style Challenge–Response Authentication
+authentication.py
 
-Protocol (mirrors PPP-CHAP, RFC 1994)
---------------------------------------
-1. GCS (authenticator) calls generatechallenge() → 16 random bytes → sends to Drone
-2. Drone calls compute_response(challenge, password) → HMAC-SHA256(key=password, msg=challenge)
-3. GCS calls verify_response(response, password)    → recomputes and compares in constant time
-
-Why CHAP?
----------
-The password is NEVER transmitted in the clear.  An eavesdropper
-who captures the challenge and response cannot derive the password
-without breaking HMAC-SHA256.  The challenge is single-use - the GCS
-clears it immediately after a verification attempt, preventing re-use.
-
-Password storage (PasswordStore)
----------------------------------
-On-disk passwords are stored as  SHA-256(salt || password) - never
-as plaintext.  This class is used to demonstrate secure storage
-best-practices in the system design, and is used at enrolment time.
-
-Note on CHAP's known limitation
---------------------------------
-CHAP requires the authenticator (GCS) to hold a copy of the plaintext
-(or reversibly encrypted) shared secret so it can recompute the expected
-HMAC.  This is a recognised trade-off inherent to CHAP.  In a production
-system this would be mitigated by storing the secret in a hardware HSM
-or a secure enclave.
+Authentication of the Drone happens in the Challenge-Response style. The following procedure takes place:
+1. The Drone and Ground Station are assumed to be in possession of the registered password.
+2. The Ground Station (authenticator) generates a unique, random challenge using the generate_challenge() function.
+3. Drone receives this challenge, computes and returns the response it got after computation through compute_response() function.
+4. Ground Station receives the response, computes the same computation by itself, and verifies through comparision.
+Due to this style of implementation, the password is never shared directly over the communication media, and is thus more secure.
 """
 
 import hashlib
 import hmac
 import os
-
 
 class PasswordStore:
     """
@@ -66,51 +43,28 @@ class PasswordStore:
         computed = hashlib.sha256(salt + password.encode("utf-8")).digest()
         return hmac.compare_digest(computed, stored_hash)
 
-
 class CHAPAuthenticator:
     """
-    CHAP Challenge–Response Authenticator.
-
-    This object lives on the GCS (server / authenticator side).
-    The Drone uses the static compute_response() method independently.
-
-    Each challenge is one-time-use: it is cleared immediately after
-    verify_response() is called, whether the attempt succeeds or not.
+    CHAP styled Challenge–Response Authenticator class which lives on the Ground Station, while the Drone uses the components of this class
+    independtly for responses alone. 
     """
-
     def __init__(self):
         self.challenge: bytes | None = None
 
     def generate_challenge(self) -> bytes:
         """
-        Generate a fresh 16-byte random challenge.
-
-        The challenge is stored internally until verify_response() is called.
+        Generate a unique, random challenge. The challenge is stored internally until verify_response() is called.
         """
         self.challenge = os.urandom(16)
         return self.challenge
 
     def verify_response(self, response: bytes, password: str) -> bool:
         """
-        Verify the drone's HMAC-SHA256 response against the active challenge.
-
-        Parameters
-        ----------
-        response : bytes received from the Drone
-        password : the shared secret held by the GCS
-
-        Returns
-        -------
-        True if the response is valid; False otherwise.
-
-        Side-effect
-        -----------
-        Clears the active challenge regardless of outcome (single-use).
+        Verifies the Drone's challenge response against the active challenge by performing the computation by itself and comparing the
+        results achieved. This is called by the authenticator, i.e. the Ground Station.
         """
         if self.challenge is None:
-            raise RuntimeError(
-                "No active challenge - call generate_challenge() first."
-            )
+            raise RuntimeError("No active challenge - call generate_challenge() first.")
         expected = CHAPAuthenticator.compute_mac(self.challenge, password)
         self.challenge = None      # invalidate immediately - prevents reuse
         return hmac.compare_digest(expected, response)
@@ -118,9 +72,7 @@ class CHAPAuthenticator:
     @staticmethod
     def compute_response(challenge: bytes, password: str) -> bytes:
         """
-        Compute the CHAP response: HMAC-SHA256(key=password, msg=challenge).
-
-        Called by the Drone upon receiving a challenge from the GCS.
+        Computes the CHAP response. Called upon by the Drone upon receiving a challenge from the Ground Station.
         """
         return CHAPAuthenticator.compute_mac(challenge, password)
 

@@ -1,12 +1,11 @@
 """
-tools/integrity.py
-==================
-Message Authentication Code — HMAC-SHA256
+integrity.py
+Message Authentication Code - HMAC-SHA256
 
 Purpose
 -------
 The MAC protects the ciphertext (and its AES nonce) from tampering
-in transit.  The GCS checks the MAC *before* decrypting — this is the
+in transit.  The GCS checks the MAC *before* decrypting - this is the
 "Encrypt-then-MAC" construction, which prevents chosen-ciphertext attacks.
 
 MAC key
@@ -17,7 +16,7 @@ they share this MAC key without ever transmitting it.
 
 Classes
 -------
-MACHandler — stateless; all methods are static helpers.
+MACHandler - stateless; all methods are static helpers.
 """
 
 import hashlib

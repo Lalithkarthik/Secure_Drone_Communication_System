@@ -1,5 +1,5 @@
 """
-tools/key_exchange.py
+key_exchange.py
 =====================
 Diffie–Hellman Key Exchange using RFC 3526 Group 14 (2048-bit MODP).
 
