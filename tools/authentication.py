@@ -1,5 +1,5 @@
 """
-authentication.py
+tools/authentication.py
 
 Authentication of the Drone happens in the Challenge-Response style. The following procedure takes place:
 1. The Drone and Ground Station are assumed to be in possession of the registered password.
