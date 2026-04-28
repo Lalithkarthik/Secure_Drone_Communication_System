@@ -1,5 +1,5 @@
 """
-digital_signature.py
+tools/digital_signature.py
 
 This file contains components used for digital signature, which ensures verification of sender and non-repudiation. The process followed
 is: 
