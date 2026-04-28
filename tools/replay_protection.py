@@ -1,29 +1,6 @@
 """
-replay_protection.py
-==========================
-Replay Attack Protection - Nonce Registry
-
-How it works
-------------
-Every DroneMessage carries a UUID4 nonce generated at creation time.
-When the GCS receives a packet it calls register_nonce().  The manager
-records the nonce in a set.  Any subsequent packet carrying the same
-nonce is immediately rejected.
-
-UUID4 uniqueness
-----------------
-A UUID4 is 122 bits of cryptographic randomness.  The probability of
-a collision across 1 billion messages is approximately 6 × 10⁻¹⁹ -
-effectively impossible in practice.
-
-Thread safety
--------------
-The internal set is protected by a threading.Lock so the manager can
-be shared safely across threads.
-
-Classes
--------
-NonceManager - one instance per GCS session.
+tools/replay_protection.py
+This file is specifically built to prevent replay attacks, and the technique chosen for that is Nonce. This file provides classes which enable the generation of a UUID4 nonce for every new message and register it with a Nonce manager, who checks and ensures the uniqueness of said nonce. In case of previously used nonce within a particular session being used again, it is an indication of replay attack, and that packet is rejected.
 """
 
 import uuid
