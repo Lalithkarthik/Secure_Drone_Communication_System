@@ -1,19 +1,6 @@
 """
-message.py
-================
-DroneMessage - the telemetry payload sent from the Drone to the GCS.
-
-Coordinate system
------------------
-The Ground Control Station sits at the origin (0, 0, 0).
-All positions are in metres relative to that origin.
-Velocities are in m/s along each axis.
-
-Replay protection
------------------
-Every message carries a UUID4 nonce generated at construction time.
-The GCS's NonceManager checks this nonce is unseen before accepting the message.
-Timestamps are intentionally omitted - nonce-based replay protection is used instead.
+tools/message.py
+This file deals with two classes, one for the Drone Status, which is an especially sensitive component of the message, can be considered to be a regular data item in the message, and the other being the DroneMessage class, which provides a template for the message that is being transmitted over the medium from the drone to the Ground Station. It considers a few common values, both suggested in the given assignment, and additions from my side, with one of them being the Drone Status.
 """
 
 import json
