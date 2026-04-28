@@ -1,5 +1,5 @@
 """
-encryption.py
+tools/encryption.py
 
 This file goes through the entire procedure of encryption of a message, and also the corresponding decryption. It follows a hybrid
 encryption scheme, combining both AES and RSA techniques, trying to get the best of both symmetric and asymmetrics cryptographic
