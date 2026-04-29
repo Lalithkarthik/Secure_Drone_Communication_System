@@ -46,8 +46,9 @@ class GroundStation:
     def __init__(self, password: str):
         self.password = password
 
-        #CHECK HERE, CONFIRM SALTING, HASHING, APPROPRIATELY
-        # Salted hash stored for auditing / display (never used for CHAP logic)
+        #The plaintext password is only used for direct initialisations, isn't considered direct storage. The passwords are stored with
+        #the ground station in a class called "PasswordStore" from tools/authentication.py. These passwords are not directly stored, but
+        #are hashed and salted and then stored. They are never directly used for authentication, printing, or any other function.
         self._pw_store = PasswordStore()
         self._pw_salt, self._pw_hash = self._pw_store.hash_password(password)
 

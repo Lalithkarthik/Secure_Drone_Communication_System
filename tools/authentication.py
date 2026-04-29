@@ -15,20 +15,15 @@ import os
 
 class PasswordStore:
     """
-    Secure salted password hashing.
-
-    Passwords are NEVER stored or logged as plaintext.
-    Each password is salted with 16 random bytes before hashing.
+    Class acting as a password manager which is responsible for salting, hashing the passwords after they have performed the initialisations.
+    The plaintext passwords are only ever used for initialisation, as they should be known by both Ground Station and Drone beforehand, and
+    are never used for any other functions. For all other functionalities and features, salted and hashed versions alone are used, as needed.
     """
 
     @staticmethod
     def hash_password(password: str) -> tuple[bytes, bytes]:
         """
-        Hash a password with a fresh random 16-byte salt.
-
-        Returns
-        -------
-        (salt, sha256_digest)  - store both; salt is not secret
+        A plaintext password with is hashed with a fresh random 16-byte salt, and the salt and hashed values are returned for actual storage.
         """
         salt   = os.urandom(16)
         digest = hashlib.sha256(salt + password.encode("utf-8")).digest()
