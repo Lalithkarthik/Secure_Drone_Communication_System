@@ -1,5 +1,6 @@
 """
 tools/integrity.py
+
 As the name suggests, this file handles the "integrity" aspect, using the Message Authentication code (MAC), specifically HMAC-SHA256. How it is implemented:
 1. Through Diffie Hellman key exchange, the key required for creating this MAC has been shared between both drone and ground station, after initialisation and authentication.
 2. After encryption with the AES session key, the drone uses this key and appends the MAC computed to the message, and continues to transmit.

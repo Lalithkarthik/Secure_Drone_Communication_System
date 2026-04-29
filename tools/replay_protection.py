@@ -1,6 +1,10 @@
 """
 tools/replay_protection.py
-This file is specifically built to prevent replay attacks, and the technique chosen for that is Nonce. This file provides classes which enable the generation of a UUID4 nonce for every new message and register it with a Nonce manager, who checks and ensures the uniqueness of said nonce. In case of previously used nonce within a particular session being used again, it is an indication of replay attack, and that packet is rejected.
+
+This file is specifically built to prevent replay attacks, and the technique chosen for that is Nonce. This file provides classes which 
+enable the generation of a UUID4 nonce for every new message and register it with a Nonce manager, who checks and ensures the uniqueness 
+of said nonce. In case of previously used nonce within a particular session being used again, it is an indication of replay attack, and 
+that packet is rejected.
 """
 
 import uuid

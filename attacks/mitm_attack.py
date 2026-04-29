@@ -55,7 +55,6 @@ from tools import (
     RSA_Signer,
 )
 
-
 class MITMAttacker:
     """
     Simulates an active Man-in-the-Middle attacker (Eve).

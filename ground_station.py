@@ -1,29 +1,20 @@
 """
 ground_station.py
-=================
-Ground Control Station (Ground Station) - the server side of the secure
-drone communication system.
 
-Responsibilities
-----------------
-Phase 1 - Authentication
-    Issue a CHAP challenge; verify the drone's HMAC response.
-
-Phase 2 - DH Key Exchange
-    Generate an ephemeral DH keypair; exchange public values with the
-    Drone to establish a shared MAC key.
-
-Phase 3 - Session Key Receipt
-    Receive the RSA-wrapped AES session key and decrypt it with the
-    Ground Station's RSA private key.
-
-Phase 4 - Receive and Validate Telemetry
-    For each incoming packet:
-        1. Verify HMAC  (integrity - Encrypt-then-MAC)
-        2. Check nonce  (replay protection)
-        3. Decrypt AES  (recover plaintext)
-        4. Verify RSA signature  (authenticity + non-repudiation)
-        5. Deserialise DroneMessage
+This is the server side of the system, which authenticates the client side, which is the Drone, and receives messages transmitted over the
+medium. The functions this file facilities the use of are the tasks that the Ground Station is required to perform:
+1. Initialise - The Ground Station class object, when created from the main.py file, initialises a Ground Station.
+2. Authentication - Issues a challenge to the Drone to validate it. Once the response is received, it performs the same challenge itself
+using the password to ensure that the response is the same to successfully authenticate the Drone.
+3. Diffie Hellman - Key exchange is followed and keys are exchanged with the Drone, which are later used to generate MAC
+4. AES Session Key - The session key generated and encrypted through RSA is received and is decrypted to obtain the actual AES key.
+5. Message receiving - Upon receiving the packets from the Drone, it performs a few sub-task for validation and security purposes, and also
+to obtain the plaintext:
+    a. It computes the MAC itself and ensures the shared and computed MACs are the same (integrity)
+    b. Checks Nonce using the NonceManager (tools/replay_protection.py) to ensure uniqueness of the nonce (replay protection)
+    c. Once the attcks seem to be prevented, the message is decrypted using the AES session key (recover plaintext)
+    d. The RSA digital signature is then verified for checking identity of sender (authentication, non-repudiation, and MITM attack prevention)
+    e. Message is then deserialised.
 """
 
 from time import sleep
@@ -40,7 +31,6 @@ from tools import (
     RSA_Signer,
 )
 
-
 class SecurityException(Exception):
     """
     Raised whenever any check fails during packet processing, like incorrect MAC, failed authentication, repeated nonce, etc. Raised to 
@@ -48,18 +38,11 @@ class SecurityException(Exception):
     """
     pass
 
-
 class GroundStation:
     """
-    Ground Control Station - authenticates drones and receives telemetry.
-
-    Parameters
-    ----------
-    password : pre-shared secret used for CHAP authentication.
-               Note: CHAP requires the authenticator to hold this value
-               so it can recompute the expected HMAC for verification.
-               In a production system it would be stored in an HSM.
+    Class representing the actual Ground Station in our system. It is initialised with the password required for authentication.
     """
+    
     def __init__(self, password: str):
         self.password = password
 
@@ -154,28 +137,13 @@ class GroundStation:
 
     def receive_message(self, packet: dict) -> DroneMessage:
         """
-        Validate and decrypt an incoming telemetry packet.
-
-        Security checks in order
-        -------------------------
-        1. Authentication gate  - drone must have completed CHAP
-        2. HMAC verification    - detect any in-transit tampering
-        3. Nonce check          - detect replayed packets
-        4. AES decryption       - recover plaintext
-        5. RSA signature check  - confirm message came from enrolled drone
-
-        Parameters
-        ----------
-        packet : dict with keys ciphertext, aes_nonce, mac, signature, msg_nonce
-                 (all binary fields are base64-encoded strings)
-
-        Returns
-        -------
-        DroneMessage on success
-
-        Raises
-        ------
-        SecurityException if any check fails - caller should discard the packet
+        The packet is received from the Drone as a dictionary, which needs to be converted to the appropriate DroneMessage class, 
+        representing the actual message, which involves a few processing steps:
+        1. Authentication check to verify whether the sender has been authenticated
+        2. MAC verification to ensure integrity of message
+        3. Nonce check to prevent replay attacks
+        4. AES decryption to recover the plaintext
+        5. Digital signature check to verify identity of sender
         """
         sleep(1)
         if not self.authenticated:

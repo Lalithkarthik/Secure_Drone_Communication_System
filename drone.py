@@ -1,28 +1,21 @@
 """
 drone.py
-========
-Drone - the client side of the secure drone communication system.
 
-Responsibilities
-----------------
-Phase 1 - Authentication
-    Receive the GCS's CHAP challenge and return an HMAC response.
-
-Phase 2 - DH Key Exchange
-    Generate an ephemeral DH keypair; exchange public values with the GCS
-    to establish a shared MAC key (first 16 bytes of the DH-derived key).
-
-Phase 3 - Session Key Distribution
-    Generate a fresh AES-256 session key; wrap it with the GCS's RSA
-    public key so only the GCS can unwrap it.
-
-Phase 4 - Telemetry Transmission
-    For each DroneMessage:
-        1. Serialise to JSON bytes
-        2. Sign with the Drone's RSA private key  (authenticity + non-repudiation)
-        3. Encrypt with AES-256-CTR session key   (confidentiality)
-        4. MAC over ciphertext + nonce            (integrity, Encrypt-then-MAC)
-        5. Return the packet dict (binary fields base64-encoded for transmission)
+This is the client side of the system, which authenticates itself with the admin side, which is the Ground Station, and transmits messages
+to it. The functions this file facilities the use of are the tasks that the Drone is required to perform:
+1. Initialisation - The main.py creates a Drone class object, which acts as our Drone, with a known password
+2. Authentication - The Drone receives the Ground Station's challenge, solves it using it's password, and sends the response back, in a
+CHAP style authentication protocol
+3. Diffie Hellman - Key exchange is followed and keys are exchanged with the Ground Station, which are later used to generate MAC
+4. AES Session key - The Drone takes responsibility for generating an AES-256 session key and shares it with the Ground Station securely 
+by wrapping it with the Ground Station's RSA.
+5. Message Transmission - After the entire setup is complete, the Drone starts communication by sharing packets with the Ground Station
+over the medium which involve the following sub-tasks:
+    a. Serialise to JSON for ease of handling
+    b. Digital Signature with Drone's own RSA private key (authenticity and non-repudiation)
+    c. Encryption with the AES session key (confidentiality)
+    d. MAC generated over the ciphertext, along with nonce, which form the core of the message required for transmission (integrity)
+    e. The final message is formed as a dictionary and shared.
 """
 
 import os
@@ -38,15 +31,9 @@ from tools import (
     RSA_Signer,
 )
 
-
 class Drone:
     """
-    Represents a drone in the secure communication system.
-
-    Parameters
-    ----------
-    drone_id : unique identifier string for this drone (e.g. "DR001")
-    password : pre-shared secret used for CHAP authentication with the GCS
+    Class representing the actual drone in our system. It is initialised with the Drone ID and the password required for authentication.
     """
 
     def __init__(self, drone_id: str, password: str):
@@ -61,7 +48,7 @@ class Drone:
         print(f"Generated Drone {drone_id}'s RSA keys successfully.")
 
         #The following variables are populated during the system simulation
-        self.gcs_public: RSAPublicKey | None = None
+        self.gs_public: RSAPublicKey | None = None
         self.dh: DHParty | None = None
         self.aes_session_key: bytes | None = None
         self.mac_key: bytes | None = None
@@ -74,12 +61,12 @@ class Drone:
         """
         return self.rsa_public_key
 
-    def set_gcs_public_key(self, gcs_public_key: RSAPublicKey) -> None:
+    def set_gs_public_key(self, gs_public_key: RSAPublicKey) -> None:
         """
         Obtains the Ground Station's RSA public key and stores it.
         """
-        self.gcs_public = gcs_public_key
-        print(f"[Drone {self.drone_id}] GCS RSA public key stored.")
+        self.gs_public = gs_public_key
+        print(f"[Drone {self.drone_id}] gs RSA public key stored.")
 
     def respond_to_challenge(self, challenge: bytes) -> bytes:
         """
@@ -100,13 +87,13 @@ class Drone:
         print(f"[Drone {self.drone_id}] DH keypair generated.")
         return public_key
 
-    def complete_dh(self, gcs_dh_public: int) -> None:
+    def complete_dh(self, gs_dh_public: int) -> None:
         """
         Exchange is performed with the Ground Station's key, to finally obtain the key for generating the MAC.
         """
         if self.dh is None:
             raise RuntimeError("Call init_dh() before complete_dh().")
-        derived = self.dh.derive_shared_key(gcs_dh_public)
+        derived = self.dh.derive_shared_key(gs_dh_public)
         self.mac_key = derived[:16] #The first 16 characters of the exchanged key are used for MAC in our implementation. Rest can be considered to be additional, potentially used later for future applications.
         sleep(1)
         print(f"[Drone {self.drone_id}] DH exchange complete - MAC key derived.")
@@ -115,35 +102,22 @@ class Drone:
         """
         Generation of AES-256 session key is done by the Drone, and is securely transmitted to the Ground Station using RSA.
         """
-        if self.gcs_public is None:
-            raise RuntimeError("GCS RSA public key not set.")
+        if self.gs_public is None:
+            raise RuntimeError("gs RSA public key not set.")
 
         self.aes_session_key  = os.urandom(32)
-        encrypted_key = HybridEncryptor.rsa_encrypt_key(self.aes_session_key, self.gcs_public)
+        encrypted_key = HybridEncryptor.rsa_encrypt_key(self.aes_session_key, self.gs_public)
         sleep(1)
         print(f"[Drone {self.drone_id}] AES-256 session key generated and RSA-wrapped. Sending securely to the Ground Station...")
         return encrypted_key
     
     def send_message(self, message: DroneMessage) -> dict:
         """
-        Package a DroneMessage into a secure, authenticated packet.
-
-        Processing order (Sign-then-Encrypt-then-MAC)
-        -----------------------------------------------
-        1. Serialise  → JSON bytes (plaintext)
-        2. Sign       → RSA-PSS signature over plaintext
-        3. Encrypt    → AES-256-CTR  → (ciphertext, aes_nonce)
-        4. MAC        → HMAC-SHA256 over (ciphertext || aes_nonce)
-
-        All binary fields are base64-encoded for safe transmission.
-
-        Parameters
-        ----------
-        message : DroneMessage to transmit
-
-        Returns
-        -------
-        dict with keys: ciphertext, aes_nonce, mac, signature, msg_nonce
+        The message of DroneMessage class (from tools/message.py) is packaged into a proper packet after a few processing steps:
+        1. Serialise to JSON
+        2. Sign with RSA private key
+        3. Encrypt with AES-256 session key
+        4. Add MAC over the ciphertext
         """
         if self.aes_session_key is None:
             raise RuntimeError("Session key not set - complete key exchange first.")

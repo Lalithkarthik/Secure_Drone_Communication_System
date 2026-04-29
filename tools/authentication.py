@@ -46,7 +46,7 @@ class PasswordStore:
 class CHAPAuthenticator:
     """
     CHAP styled Challenge–Response Authenticator class which lives on the Ground Station, while the Drone uses the components of this class
-    independtly for responses alone. 
+    independently for responses alone. 
     """
     def __init__(self):
         self.challenge: bytes | None = None

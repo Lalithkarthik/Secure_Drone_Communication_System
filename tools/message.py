@@ -1,6 +1,10 @@
 """
 tools/message.py
-This file deals with two classes, one for the Drone Status, which is an especially sensitive component of the message, can be considered to be a regular data item in the message, and the other being the DroneMessage class, which provides a template for the message that is being transmitted over the medium from the drone to the Ground Station. It considers a few common values, both suggested in the given assignment, and additions from my side, with one of them being the Drone Status.
+
+This file deals with two classes, one for the Drone Status, which is an especially sensitive component of the message, can be considered 
+to be a regular data item in the message, and the other being the DroneMessage class, which provides a template for the message that is 
+being transmitted over the medium from the drone to the Ground Station. It considers a few common values, both suggested in the given 
+assignment, and additions from my side, with one of them being the Drone Status.
 """
 
 import json
@@ -8,7 +12,6 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Tuple
-
 
 class DroneStatus(Enum):
     """
@@ -33,7 +36,6 @@ class DroneMessage:
     status: DroneStatus #Treated as the most critical value in the packet
     mission_id: str
     nonce: str = field(default_factory=lambda: str(uuid.uuid4())) #Randomly generate nonce to deal with replay attacks
-
 
     def to_json(self) -> str:
         """
